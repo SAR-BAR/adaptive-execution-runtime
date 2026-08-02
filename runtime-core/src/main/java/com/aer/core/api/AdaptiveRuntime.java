@@ -1,5 +1,9 @@
 package com.aer.core.api;
 
+import com.aer.core.executor.BoundedExecutorStrategy;
+import com.aer.core.executor.CpuExecutorStrategy;
+import com.aer.core.executor.ExecutorStrategyRegistry;
+import com.aer.core.executor.VirtualThreadStrategy;
 import com.aer.core.scheduling.TaskEventHandler;
 import com.aer.core.submission.DisruptorBootstrap;
 import com.aer.core.task.AdaptiveTask;
@@ -13,16 +17,25 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
 
- //The single public entry point an application uses.
+//The single public entry point an application uses.
 public final class AdaptiveRuntime implements AutoCloseable {
 
     private final DisruptorBootstrap bootstrap;
+    private final ExecutorStrategyRegistry registry;
 
     private AdaptiveRuntime(AdaptiveRuntimeConfig config) {
+        this.registry = new ExecutorStrategyRegistry(
+                new VirtualThreadStrategy(),
+                new CpuExecutorStrategy(config.cpuExecutorParallelism()),
+                new BoundedExecutorStrategy(
+                        config.boundedExecutorCoreSize(),
+                        config.boundedExecutorMaxSize(),
+                        config.boundedExecutorQueueCapacity())
+        );
         this.bootstrap = new DisruptorBootstrap(
                 config.ringBufferSize(),
                 toDisruptorWaitStrategy(config.waitStrategy()),
-                new TaskEventHandler());
+                new TaskEventHandler(registry));
         this.bootstrap.start();
     }
 
@@ -45,6 +58,7 @@ public final class AdaptiveRuntime implements AutoCloseable {
     @Override
     public void close() {
         bootstrap.shutdown();
+        registry.shutdownAll();
     }
 
     private static WaitStrategy toDisruptorWaitStrategy(AdaptiveRuntimeConfig.WaitStrategyChoice choice) {

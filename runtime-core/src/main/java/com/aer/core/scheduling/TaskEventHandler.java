@@ -1,26 +1,23 @@
 package com.aer.core.scheduling;
 
+import com.aer.core.executor.ExecutorStrategy;
+import com.aer.core.executor.ExecutorStrategyRegistry;
 import com.aer.core.submission.TaskEvent;
 import com.lmax.disruptor.EventHandler;
 
-import java.util.concurrent.Callable;
-import java.util.concurrent.CompletableFuture;
-
-//The Disruptor consumer.
+//The Disruptor consumer; dispatches only, never runs task bodies itself.
 public final class TaskEventHandler implements EventHandler<TaskEvent> {
+
+    private final ExecutorStrategyRegistry registry;
+
+    public TaskEventHandler(ExecutorStrategyRegistry registry) {
+        this.registry = registry;
+    }
 
     @Override
     public void onEvent(TaskEvent event, long sequence, boolean endOfBatch) {
-        Callable<?> action = event.getTask().action();
-        CompletableFuture<Object> future = event.getFuture();
-
-        try {
-            Object result = action.call();
-            future.complete(result);
-        } catch (Throwable t) {
-            future.completeExceptionally(t);
-        } finally {
-            event.clear();
-        }
+        ExecutorStrategy strategy = registry.select(event.getTask());
+        strategy.execute(event.getTask(), event.getFuture());
+        event.clear();
     }
 }

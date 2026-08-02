@@ -1,7 +1,14 @@
 package com.aer.core.api;
 
 
-public record AdaptiveRuntimeConfig(int ringBufferSize, WaitStrategyChoice waitStrategy) {
+public record AdaptiveRuntimeConfig(
+        int ringBufferSize,
+        WaitStrategyChoice waitStrategy,
+        int cpuExecutorParallelism,
+        int boundedExecutorCoreSize,
+        int boundedExecutorMaxSize,
+        int boundedExecutorQueueCapacity
+) {
 
     public AdaptiveRuntimeConfig {
         if (Integer.bitCount(ringBufferSize) != 1) {
@@ -11,7 +18,8 @@ public record AdaptiveRuntimeConfig(int ringBufferSize, WaitStrategyChoice waitS
     }
 
     public static AdaptiveRuntimeConfig defaultConfig() {
-        return new AdaptiveRuntimeConfig(1024, WaitStrategyChoice.BLOCKING);
+        return new AdaptiveRuntimeConfig(1024, WaitStrategyChoice.BLOCKING, Runtime.getRuntime().availableProcessors(), 4, 16, 256
+        );
     }
 
 
